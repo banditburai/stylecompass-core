@@ -1,20 +1,15 @@
 from pathlib import Path
 from typing import Dict, Any, Optional
 import pandas as pd
-from .base import ImageDataset
+from torch.utils.data import Dataset
 
-class BatchImageDataset(ImageDataset):
+class BatchImageDataset(Dataset):  # Inherit from torch.utils.data.Dataset
     """Dataset for loading processed image batches with metadata."""
     
     def __init__(self, root_dir: Path, batch_csv: Path, transform=None):
-        """Initialize dataset.
-        
-        Args:
-            root_dir: Root directory containing batch folders
-            batch_csv: Path to batch CSV file with metadata
-            transform: Optional transform to apply to images
-        """
-        super().__init__(root_dir, transform)
+        """Initialize dataset."""
+        self.root_dir = root_dir
+        self.transform = transform
         
         # Load batch metadata
         self.metadata = pd.read_csv(batch_csv)
@@ -23,16 +18,13 @@ class BatchImageDataset(ImageDataset):
         ]
     
     def __getitem__(self, idx: int) -> Dict[str, Any]:
-        """Get image and metadata.
+        """Get image and metadata."""
+        # Load and transform image
+        image_path = self.image_files[idx]
+        image = self.load_image(image_path)
         
-        Returns:
-            Dict containing:
-                image: Transformed image tensor
-                batch_id: Batch identifier
-                source_tar: Original tar file
-        """
-        # Get image using parent class
-        image = super().__getitem__(idx)
+        if self.transform:
+            image = self.transform(image)
         
         # Add metadata
         return {
@@ -40,3 +32,6 @@ class BatchImageDataset(ImageDataset):
             'batch_id': self.metadata.iloc[idx]['batch_id'],
             'source_tar': self.metadata.iloc[idx]['source_tar']
         }
+        
+    def __len__(self) -> int:
+        return len(self.image_files)

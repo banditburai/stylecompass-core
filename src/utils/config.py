@@ -61,12 +61,17 @@ class TrainingConfig:
     distributed: DistributedConfig = field(default_factory=DistributedConfig)
 
 class Config:
-    """Configuration management with type-safe access."""
-    
-    def __init__(self, config_path: Optional[Union[Path, str]] = None):
-        self._config: Dict[str, Any] = {}
-        if config_path:
-            self.load_config(Path(config_path))
+    def __init__(self, config_path: Path):
+        with open(config_path) as f:
+            self._config = yaml.safe_load(f)
+            
+        # Convert the raw dict into object attributes
+        for key, value in self._config.items():
+            if isinstance(value, dict):
+                # Create a proper nested namespace
+                setattr(self, key, self._dict_to_namespace(value))
+            else:
+                setattr(self, key, value)
 
     def load_config(self, config_path: Path) -> None:
         """Load configuration from YAML file."""
@@ -77,6 +82,16 @@ class Config:
         except Exception as e:
             logger.error(f"Failed to load config from {config_path}: {e}")
             raise
+            
+    def _dict_to_namespace(self, d: dict) -> Any:
+        """Recursively convert dictionary to namespace."""
+        namespace = type('Namespace', (), {})
+        for key, value in d.items():
+            if isinstance(value, dict):
+                setattr(namespace, key, self._dict_to_namespace(value))
+            else:
+                setattr(namespace, key, value)
+        return namespace
 
     @cached_property
     def distributed(self) -> DistributedConfig:
@@ -106,6 +121,15 @@ class Config:
         """Enable dictionary-like access for backward compatibility."""
         return self._config[key]
 
-    def get(self, key: str, default: Any = None) -> Any:
-        """Dictionary-like get with default for backward compatibility."""
-        return self._config.get(key, default)
+    def get(self, path: str, default: Any = None) -> Any:
+        """Get nested config value using dot notation."""
+        current = self._config
+        for key in path.split('.'):
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                return default
+        return current
+
+    def __repr__(self) -> str:
+        return f"Config({self._config})"

@@ -53,17 +53,14 @@ class BatchDatasetPreparator:
         end_part: int,
         dataset_name: Optional[str] = None
     ) -> Optional[Path]:
-        """Process a batch of tar files and create corresponding CSV.
-        
-        Args:
-            start_part: Starting tar file number
-            end_part: Ending tar file number
-            dataset_name: Optional dataset name override
-        """
-        # Use config value if no override provided
+        """Process a batch of tar files and create corresponding CSV."""
         dataset_name = dataset_name or self.config.get("dataset.name")
         
-        # Download tars (reusing your TarProcessor)
+        logger.info(f"Processing batch {start_part} to {end_part} from {dataset_name}")
+        logger.info(f"Temp directory: {self.temp_dir}")
+        logger.info(f"Output directory: {self.output_dir}")
+        
+        # Download tars
         processor = TarProcessor(dataset_name)
         processor.download_tar_range(start_part, end_part)
         
@@ -73,12 +70,12 @@ class BatchDatasetPreparator:
         batch_dir = self.output_dir / batch_name
         batch_dir.mkdir(exist_ok=True)
         
-        cache_dir = Path(self.config.get("paths.cache_dir")).expanduser()
+        # Look in temp_dir instead of cache_dir
+        logger.info(f"Looking for tars in: {self.temp_dir}")
         
         with self._temp_extraction() as temp_dir:
-            for tar_path in cache_dir.glob("*"):
-                if not tar_path.is_file():
-                    continue
+            for tar_path in self.temp_dir.glob("dataset_part_*.tar"):
+                logger.info(f"Processing tar: {tar_path}")
                 
                 try:
                     with tarfile.open(tar_path, "r") as tar:
@@ -94,8 +91,8 @@ class BatchDatasetPreparator:
                                 dest_path = batch_dir / img_path.relative_to(temp_dir)
                                 dest_path.parent.mkdir(parents=True, exist_ok=True)
                                 
-                                # Move valid image
-                                img_path.rename(dest_path)
+                                # Copy instead of rename
+                                shutil.copy2(img_path, dest_path)
                                 valid_images.append({
                                     'path': str(dest_path.relative_to(self.output_dir)),
                                     'batch_id': batch_name,

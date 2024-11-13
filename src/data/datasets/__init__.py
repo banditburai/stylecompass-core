@@ -1,3 +1,3 @@
-from .base import ImageDataset
+from .base import BatchImageDataset
 
-__all__ = ["ImageDataset"]
+__all__ = ["BatchImageDataset"]

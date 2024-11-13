@@ -3,6 +3,7 @@ from pathlib import Path
 from src.data.preprocessing import BatchDatasetPreparator
 from src.utils import setup_logger, Config
 from typing import Optional
+from src.utils import BatchHelper
 
 logger = setup_logger(__name__)
 
@@ -10,26 +11,32 @@ logger = setup_logger(__name__)
 @click.option('--config', type=click.Path(exists=True), 
               default='configs/data_processing.yaml',
               help='Path to config file')
-@click.option('--start-part', type=int, required=True)
-@click.option('--end-part', type=int, required=True)
+@click.option('--next-batch', is_flag=True, help='Use next batch range')
 @click.option('--output-dir', type=click.Path())
-def main(config: str, start_part: int, end_part: int, output_dir: Optional[str]):
+def main(config: str, next_batch: bool, output_dir: Optional[str]):
     """Process a batch of images from tar files."""
-    config = Config(Path(config))
+    config_path = Path(config)
+    config_obj = Config(config_path)
+    batch_helper = BatchHelper(config_path)
     
-    # Use config with CLI override
-    output_dir = output_dir or config.get("paths.output_dir")
+    if next_batch:
+        start_part, end_part = batch_helper.next_batch()
+    else:
+        start_part, end_part = batch_helper.get_current_batch()
     
+    logger.info(f"Processing batch {start_part} to {end_part}")
+    
+    output_dir = output_dir or config_obj.get("paths.output_dir")
     preparator = BatchDatasetPreparator(
         output_dir=Path(output_dir),
-        config_path=Path(config)
+        config_path=config_path
     )
     
     try:
         csv_path = preparator.process_tar_batch(
             start_part=start_part,
             end_part=end_part,
-            dataset_name=config.get("dataset.name")
+            dataset_name=config_obj.get("dataset.name")
         )
         
         if csv_path:
