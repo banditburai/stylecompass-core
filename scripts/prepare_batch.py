@@ -1,5 +1,6 @@
 import click
 from pathlib import Path
+import multiprocessing
 from src.data.preprocessing import BatchDatasetPreparator
 from src.utils import setup_logger, Config
 from typing import Optional
@@ -13,7 +14,10 @@ logger = setup_logger(__name__)
               help='Path to config file')
 @click.option('--next-batch', is_flag=True, help='Use next batch range')
 @click.option('--output-dir', type=click.Path())
-def main(config: str, next_batch: bool, output_dir: Optional[str]):
+@click.option('--num-workers', type=int, 
+              default=min(multiprocessing.cpu_count(), 4),
+              help='Number of worker processes')
+def main(config: str, next_batch: bool, output_dir: Optional[str], num_workers: int):
     """Process a batch of images from tar files."""
     config_path = Path(config)
     config_obj = Config(config_path)
@@ -25,6 +29,7 @@ def main(config: str, next_batch: bool, output_dir: Optional[str]):
         start_part, end_part = batch_helper.get_current_batch()
     
     logger.info(f"Processing batch {start_part} to {end_part}")
+    logger.info(f"Using {num_workers} workers")
     
     output_dir = output_dir or config_obj.get("paths.output_dir")
     preparator = BatchDatasetPreparator(
@@ -36,7 +41,8 @@ def main(config: str, next_batch: bool, output_dir: Optional[str]):
         csv_path = preparator.process_tar_batch(
             start_part=start_part,
             end_part=end_part,
-            dataset_name=config_obj.get("dataset.name")
+            dataset_name=config_obj.get("dataset.name"),
+            num_workers=num_workers
         )
         
         if csv_path:
