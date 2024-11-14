@@ -29,6 +29,8 @@ dependencies = [
 [project.scripts]
 compass-download = "scripts.download_tars:main"
 compass-prepare = "scripts.prepare_batch:main"
+compass-thumbnails = "scripts.prepare_thumbnails:main"
+compass-priors = "scripts.generate_priors:main"
 compass-clean = "scripts.clean_cache:main"
 
 [build-system]
