@@ -1,12 +1,9 @@
 import click
-from pathlib import Path
 import sys
+from pathlib import Path
 from src.utils import setup_logger, Config, BatchHelper
 from typing import Optional
-
-# Add stylepriors to path
-STYLEPRIORS_PATH = Path(__file__).parent.parent / "stylepriors"
-sys.path.append(str(STYLEPRIORS_PATH))
+import subprocess
 
 logger = setup_logger(__name__)
 
@@ -20,12 +17,22 @@ logger = setup_logger(__name__)
 @click.option('--num-workers', '-j', type=int, default=8,
               help='Number of data loading workers')
 @click.option('--checkpoint', type=click.Path(exists=True),
-              default='models/checkpoint.pth',
+              default=None, 
               help='Path to model checkpoint')
-def main(config: str, next_batch: bool, batch_size: int, num_workers: int, checkpoint: str):
-    """Generate style embeddings for a batch of processed images."""
+def main(config: str, next_batch: bool, batch_size: int, num_workers: int, checkpoint: Optional[str]):
     config_path = Path(config)
     config_obj = Config(config_path)
+    
+    # Get stylepriors path from config
+    stylepriors_path = Path(config_obj.get("paths.stylepriors_path"))
+    if not stylepriors_path.exists():
+        raise click.BadParameter(f"Stylepriors path not found at {stylepriors_path}")
+    
+    # Use checkpoint from config if not specified
+    checkpoint_path = Path(checkpoint) if checkpoint else Path(config_obj.get("paths.checkpoint_path"))
+    if not checkpoint_path.exists():
+        raise click.BadParameter(f"Checkpoint not found at {checkpoint_path}")
+    
     batch_helper = BatchHelper(config_path)
     
     if next_batch:
@@ -36,8 +43,8 @@ def main(config: str, next_batch: bool, batch_size: int, num_workers: int, check
     # Get paths from config
     batch_name = f"batch_{start_part}_{end_part}"
     batch_dir = Path(config_obj.get("paths.output_dir")) / batch_name
-    dataset_dir = batch_dir / "dataset_temp"  # Add this line for the inner folder
-    embeddings_dir = batch_dir / "embeddings"  # Change this to save in batch folder
+    dataset_dir = batch_dir / "dataset_temp"
+    embeddings_dir = batch_dir / "embeddings"
     
     # Ensure batch has been processed
     csv_path = batch_dir / f"{batch_name}.csv"
@@ -48,13 +55,10 @@ def main(config: str, next_batch: bool, batch_size: int, num_workers: int, check
     logger.info(f"Generating embeddings for batch {start_part} to {end_part}")
     logger.info(f"Using batch size {batch_size} and {num_workers} workers")
     
-    # Import main_sim here to avoid early import issues
-    from stylepriors.main_sim import main as stylepriors_main
-    import sys
-    
-    # Prepare arguments for stylepriors
-    sys.argv = [
-        "prepare_embeddings",
+    # Build command
+    cmd = [
+        "python",
+        str(stylepriors_path / "main_sim.py"),
         "--dataset", "sref",
         "-a", "vit_large",
         "--pt_style", "csd",
@@ -65,14 +69,15 @@ def main(config: str, next_batch: bool, batch_size: int, num_workers: int, check
         "-j", str(num_workers),
         "--embed_dir", str(embeddings_dir),
         "--data-dir", str(dataset_dir),
-        "--model_path", str(checkpoint),
+        "--model_path", str(checkpoint_path),
         "--csv-path", str(csv_path)
     ]
     
     try:
-        stylepriors_main()
+        logger.info(f"Running command: {' '.join(cmd)}")
+        result = subprocess.run(cmd, check=True, text=True)
         logger.info(f"Successfully generated embeddings for batch {batch_name}")
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
         logger.error(f"Error generating embeddings: {e}")
         raise
 
