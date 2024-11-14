@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 from dataclasses import dataclass
 from src.utils import setup_logger, Config
 import subprocess
