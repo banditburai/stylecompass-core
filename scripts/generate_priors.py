@@ -5,7 +5,11 @@ from src.utils import setup_logger, Config, BatchHelper
 from typing import Optional
 import subprocess
 
-logger = setup_logger(__name__)
+script_name = Path(__file__).stem
+log_dir = Path("logs")
+log_dir.mkdir(exist_ok=True)
+log_file = log_dir / f"{script_name}.log"  # where script_name matches the script's purpose
+logger = setup_logger(__name__, log_file=log_file)
 
 @click.command()
 @click.option('--config', type=click.Path(exists=True), 

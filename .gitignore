@@ -40,3 +40,4 @@ tmp/
 processed_batches/
 thumbnails/
 embeddings/
+logs/

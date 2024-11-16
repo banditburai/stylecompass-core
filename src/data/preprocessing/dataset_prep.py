@@ -12,6 +12,7 @@ import shutil
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import multiprocessing
+from tqdm import tqdm
 
 logger = setup_logger(__name__)
 
@@ -183,7 +184,7 @@ class BatchDatasetPreparator:
             # Process tars in parallel using static method
             with ProcessPoolExecutor(max_workers=num_workers) as executor:
                 futures = []
-                for tar_path in tar_files:
+                for tar_path in tqdm(tar_files, desc="Processing tar files"):
                     futures.append(
                         executor.submit(
                             self._process_single_tar_static,

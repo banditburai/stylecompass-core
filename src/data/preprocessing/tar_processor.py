@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import List, Optional, Dict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from src.utils import setup_logger, Config
 import subprocess
 import os
@@ -10,39 +10,34 @@ logger = setup_logger(__name__)
 @dataclass
 class TarProcessor:
     dataset_name: str
-    config_path: Optional[Path] = None
+    config_path: Path = field(default=Path('configs/data_processing.yaml'))
+    config: Config = field(init=False)
+    paths: Dict[str, Path] = field(init=False)
     
-    def __post_init__(self) -> None:
-        # Get project root directory
-        project_root = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-        
-        # Use provided config path or default
-        default_config = project_root / "configs" / "data_processing.yaml"
-        config_path = self.config_path or default_config
-        
-        logger.info(f"Loading config from: {config_path}")
-        self.config = Config(config_path)
+    def __post_init__(self):
+        """Initialize after creation"""
+        self.config = Config(self.config_path)
+        self.paths = {
+            'cache_dir': Path(self.config.get("paths.cache_dir")),
+            'checkpoint_path': Path(self.config.get("paths.checkpoint_path")),
+            'embeddings_dir': Path(self.config.get("paths.embeddings_dir")),
+            'output_dir': Path(self.config.get("paths.output_dir")),
+            'stylepriors_path': Path(self.config.get("paths.stylepriors_path")),
+            'temp_dir': Path(self.config.get("paths.temp_dir"))
+        }
         self._setup_directories()
     
     def _setup_directories(self) -> None:
-        """Create necessary directories from config paths."""
-        # Get paths from config
-        paths_dict: Dict[str, str] = self.config.get("paths", {})
-        
-        # Convert strings to Path objects and expand user paths
-        self.paths = {
-            key: Path(str(path)).expanduser().resolve()
-            for key, path in paths_dict.items()
-        }
-        
-        logger.info(f"Setting up directories: {self.paths}")
-        
-        # Create directories
-        for path_key, path in self.paths.items():
-            # Create directory and any parent directories
-            path.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Created directory: {path}")
-            setattr(self, path_key, path)
+        """Create necessary directories if they don't exist."""
+        for name, path in self.paths.items():
+            # Skip if it's a file path rather than a directory
+            if name in ['checkpoint_path', 'stylepriors_path']:
+                # These are files, not directories
+                continue
+            
+            # Create directories
+            if not path.exists():
+                path.mkdir(parents=True, exist_ok=True)
 
     def download_tar_range(self, start_part: int, end_part: int) -> None:
         """Download specific tar files using huggingface-cli"""

@@ -6,7 +6,11 @@ from src.utils import setup_logger, Config
 from typing import Optional
 from src.utils import BatchHelper
 
-logger = setup_logger(__name__)
+script_name = Path(__file__).stem
+log_dir = Path("logs")
+log_dir.mkdir(exist_ok=True)
+log_file = log_dir / f"{script_name}.log"  # where script_name matches the script's purpose
+logger = setup_logger(__name__, log_file=log_file)
 
 @click.command()
 @click.option('--config', type=click.Path(exists=True), 
@@ -31,9 +35,10 @@ def main(config: str, next_batch: bool, output_dir: Optional[str], num_workers: 
     logger.info(f"Processing batch {start_part} to {end_part}")
     logger.info(f"Using {num_workers} workers")
     
-    output_dir = output_dir or config_obj.get("paths.output_dir")
+    output_dir_path = Path(output_dir) if output_dir else Path(config_obj.get("paths.output_dir"))
+    
     preparator = BatchDatasetPreparator(
-        output_dir=Path(output_dir),
+        output_dir=output_dir_path,
         config_path=config_path
     )
     

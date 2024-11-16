@@ -2,47 +2,40 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple
 from .config import Config
+import yaml
 
 @dataclass
 class BatchHelper:
     config_path: Path
     
+    def __init__(self, config_path: Path):
+        self.config_path = config_path
+        with open(config_path) as f:
+            self.config = yaml.safe_load(f)
+    
     def get_current_batch(self) -> Tuple[int, int]:
-        """Get current batch start and end."""
-        config = Config(self.config_path)
+        """Get current batch start and end from config"""
         return (
-            config.get("batch.current_start", 1),
-            config.get("batch.current_end", 5)
+            self.config["batch"]["current_start"],
+            self.config["batch"]["current_end"]
         )
     
-    def update_batch_range(self, start: int, end: int) -> None:
-        """Update batch range in config."""
-        import yaml
+    def next_batch(self, update_config: bool = True) -> Tuple[int, int]:
+        """Get next batch range and optionally update config file"""
+        current_start = self.config["batch"]["current_start"]
+        step_size = self.config["batch"]["step_size"]
+        total_parts = self.config["batch"]["total_parts"]
         
-        with open(self.config_path) as f:
-            config_data = yaml.safe_load(f)
+        next_start = current_start + step_size
+        next_end = min(next_start + step_size - 1, total_parts)
         
-        if 'batch' not in config_data:
-            config_data['batch'] = {}
+        if update_config:
+            # Update config in memory
+            self.config["batch"]["current_start"] = next_start
+            self.config["batch"]["current_end"] = next_end
             
-        config_data['batch']['current_start'] = start
-        config_data['batch']['current_end'] = end
+            # Write back to file
+            with open(self.config_path, 'w') as f:
+                yaml.dump(self.config, f, default_flow_style=False)
         
-        with open(self.config_path, 'w') as f:
-            yaml.dump(config_data, f, default_flow_style=False)
-    
-    def next_batch(self) -> Tuple[int, int]:
-        """Get next batch range and update config."""
-        config = Config(self.config_path)
-        step = config.get("batch.step_size", 5)
-        total = config.get("batch.total_parts", 200)
-        
-        current_start, current_end = self.get_current_batch()
-        next_start = current_end + 1
-        next_end = min(next_start + step - 1, total)
-        
-        if next_start > total:
-            raise ValueError("No more batches available")
-            
-        self.update_batch_range(next_start, next_end)
         return next_start, next_end
