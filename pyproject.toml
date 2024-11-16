@@ -40,6 +40,7 @@ compass-priors = "scripts.generate_priors:main"
 compass-upsert = "scripts.upsert_embeddings:main"
 compass-delete = "scripts.delete_batch:main"
 compass-clean = "scripts.clean_cache:main"
+compass-check = "scripts.check_missing:main"
 
 [build-system]
 requires = ["hatchling"]
